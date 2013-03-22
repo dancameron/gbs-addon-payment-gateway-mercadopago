@@ -1,15 +1,15 @@
 <?php
 /*
-Plugin Name: Group Buying Payment Processor - Pagseguro
-Version: 1.2 Beta
-Description: Pagseguro Add-on for GBS. Requires GBS 3.1+
-Plugin URI: http://groupbuyingsite.com/marketplace
-Author: GroupBuyingSite.com
-Author URI: http://groupbuyingsite.com/features
+Plugin Name: Group Buying Payment Processor - Mercadopago
+Version: .1
+Plugin URI: http://sproutventure.com/wordpress/group-buying
+Description: Mercadopago Payments Add-on.
+Author: Sprout Venture
+Author URI: http://sproutventure.com/wordpress
 Plugin Author: Dan Cameron
-Plugin Author URI: http://sproutventure.com/
-Contributors: Dan Cameron, Jonathan Brinley, Nathan Stryker & Will Anderson
+Contributors: Dan Cameron
 Text Domain: group-buying
+Domain Path: /lang
 */
 
 add_action('gb_register_processors', 'gb_load_mps');
