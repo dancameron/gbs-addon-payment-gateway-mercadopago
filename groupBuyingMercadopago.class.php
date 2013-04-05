@@ -75,7 +75,7 @@ class Group_Buying_Mercadopago extends Group_Buying_Offsite_Processors {
 	}
 
 	public static function checkout_icon() {
-		return '<img src="http://f.cl.ly/items/2c361k270x1A0z2j0T2J/Image%202013.03.20%203:26:35%20PM.png" title="Mercadopago Payments" id="mercadopago_icon"/>';
+		return '<img src="https://s3.amazonaws.com/checkout_images/466be15d-fdb2-4d70-9717-b2b267f296cc.png" title="Mercadopago Payments" id="mercadopago_icon"/>';
 	}
 
 	/**
@@ -554,7 +554,8 @@ class Group_Buying_Mercadopago extends Group_Buying_Offsite_Processors {
 	public function payment_controls( $controls, Group_Buying_Checkouts $checkout ) {
 
 		if ( isset( $controls['review'] ) ) {
-			$controls['review'] = str_replace( 'value="'.self::__( 'Review' ).'"', $style . ' value="'.self::__( 'Mercadopago' ).'"', $controls['review'] );
+			$controls['review'] = str_replace( 'value="'.self::__( 'Review' ).'"', ' src="https://s3.amazonaws.com/checkout_images/466be15d-fdb2-4d70-9717-b2b267f296cc.png" value="'.self::__( 'Mercadopago' ).'"', $controls['review'] );
+			$controls['review'] = str_replace( 'type="submit"', 'type="image"', $controls['review'] );
 		}
 		return $controls;
 	}
