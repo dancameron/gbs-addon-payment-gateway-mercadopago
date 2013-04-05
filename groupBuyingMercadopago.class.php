@@ -61,6 +61,9 @@ class Group_Buying_Mercadopago extends Group_Buying_Offsite_Processors {
 		// Change button
 		add_filter( 'gb_checkout_payment_controls', array( $this, 'payment_controls' ), 20, 2 );
 
+		// Test user
+		// add_filter( 'init', array( $this, 'get_test_user' ) );
+
 	}
 
 	public static function register() {
@@ -430,7 +433,45 @@ class Group_Buying_Mercadopago extends Group_Buying_Offsite_Processors {
 				'headers' => $headers
 			) );
 		$response = json_decode( wp_remote_retrieve_body( $return_response ), true );
-		error_log( "status api response: " . print_r( $response, true ) );
+		return $response;
+	}
+
+	/**
+	 * API call to check a payments status
+	 * @param  int $id the id provided on return
+	 * @return      
+	 */
+	public function get_test_user( $id ) {
+		$access_token = $this->get_access_token();
+		$url = "https://api.mercadolibre.com/users/test_user?access_token=" . $access_token;
+		$headers = array( 'Accept: application/json', 'Content-Type: application/x-www-form-urlencoded' );
+		
+		$options = array(
+			CURLOPT_RETURNTRANSFER => '1',
+			CURLOPT_HTTPHEADER => $headers,
+			CURLOPT_SSL_VERIFYPEER => 'false',
+			CURLOPT_URL => $url,
+			CURLOPT_POSTFIELDS => json_encode($data),
+			CURLOPT_CUSTOMREQUEST => "POST",
+		);
+		$call = curl_init();
+		curl_setopt_array( $call, $options );
+		// execute the curl call
+		$dados = curl_exec( $call );
+		// close the call
+		curl_close( $call );
+		$response = json_decode($dados, true);
+
+		/*/
+		$return_response = wp_remote_post( $url, array(
+				'method' => 'POST',
+				'body' => array('site_id'=>'MLA'),
+				'timeout' => apply_filters( 'http_request_timeout', 15 ),
+				'sslverify' => false,
+				'headers' => $headers
+			) );
+		$response = json_decode( wp_remote_retrieve_body( $return_response ), true );
+		/**/
 		return $response;
 	}
 
