@@ -136,18 +136,18 @@ class Group_Buying_Mercadopago extends Group_Buying_Offsite_Processors {
 		$item_description = '';
 		foreach ( $cart->get_items() as $key => $item ) {
 			$deal = Group_Buying_Deal::get_instance( $item['deal_id'] );
-			$item_description .= $deal->get_title( $item['data'] ) .'*'. $item['quantity'] .'; ';
+			$item_description .= $item['quantity'] .'*'. $deal->get_title( $item['data'] ) .'; ';
 		}
 
 		$data = array(
 			"external_reference" => self::get_token(),
 			"items" => array(
 				array( 
-					"id" => self::get_token(), // updated
+					"id" => self::get_token(),
 					"title" => substr( get_bloginfo('name'), 0, 90),
 					"description" => $item_description,
-					"quantity" => 1,
-					"unit_price" => round( gb_get_number_format( $filtered_total ), 2 ),
+					"quantity" => (int) 1,
+					"unit_price" => (int) gb_get_number_format( $filtered_total ),
 					"currency_id" => $this->curcode,
 					"picture_url" => gb_get_header_logo(),
 				) ),
@@ -165,22 +165,41 @@ class Group_Buying_Mercadopago extends Group_Buying_Offsite_Processors {
 			),
 		);
 
-		
+		// Call MP API
 		$access_token = $this->get_access_token();
 		$url = 'https://api.mercadolibre.com/checkout/preferences?access_token=' . $access_token;
 		$headers = array( 'Content-Type:application/json', 'Accept: application/json' );
+		$options = array(
+			CURLOPT_RETURNTRANSFER => '1',
+			CURLOPT_HTTPHEADER => $headers,
+			CURLOPT_SSL_VERIFYPEER => 'false',
+			CURLOPT_URL => $url,
+			CURLOPT_POSTFIELDS => json_encode($data),
+			CURLOPT_CUSTOMREQUEST => "POST",
+		);
+		$call = curl_init();
+		curl_setopt_array( $call, $options );
+		// execute the curl call
+		$dados = curl_exec( $call );
+		// close the call
+		curl_close( $call );
+		$response = json_decode($dados, true);
+
+		/*/
 		$return_response = wp_remote_post( $url, array(
 				'method' => 'POST',
-				'body' => $data,
+				'body' => json_encode($data),
 				'timeout' => apply_filters( 'http_request_timeout', 15 ),
 				'sslverify' => false,
 				'headers' => $headers
 			) );
 		$response = json_decode( wp_remote_retrieve_body( $return_response ), true );
 		error_log( "button api resposne: " . print_r( $response, true ) );
+		/**/
+
 		$link = $response['init_point'];
 		$button = '<a href="'.$link.'" name="MP-payButton" class="blue-l-rn-ar" id="btnPagar">Comprar</a>';
-		$button .= '<script type="text/javascript" src="https://www.mercadopago.com/org-img/jsapi/mptools/buttons/render.js"></script>';
+		// $button .= '<script type="text/javascript" src="https://www.mercadopago.com/org-img/jsapi/mptools/buttons/render.js"></script>';
 
 		echo  '<style type="text/css">#branding{z-index:100;}</style>';
 
@@ -425,6 +444,7 @@ class Group_Buying_Mercadopago extends Group_Buying_Offsite_Processors {
 		$access_token = $this->get_access_token();
 		$url = "https://api.mercadolibre.com/collections/notifications/" . $id . "?access_token=" . $access_token;
 		$headers = array( 'Accept: application/json', 'Content-Type: application/x-www-form-urlencoded' );
+
 		$return_response = wp_remote_post( $url, array(
 				'method' => 'POST',
 				'body' => array(),
@@ -503,9 +523,7 @@ class Group_Buying_Mercadopago extends Group_Buying_Offsite_Processors {
 				'sslverify' => false,
 				'headers' => $headers
 			) );
-		error_log( "post data: " . print_r( $post_data, true ) );
 		$response = json_decode( wp_remote_retrieve_body( $return_response ), true );
-		error_log( "api access token response: " . print_r( $response, true ) );
 		// set the access token
 		$this->accesstoken = $response['access_token'];
 		$this->date = $time;

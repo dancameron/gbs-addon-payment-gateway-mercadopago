@@ -521,7 +521,8 @@ class Shop extends Basic {
 			$opt = array(
 				"external_reference" => $data['external_reference'],
 				"items" => array(
-					array ( "id" => $data['external_reference'], // updated
+					array( 
+						"id" => $data['external_reference'], // updated
 						"title" => $data['title'],
 						"description" => $data['quantity'] . ' x ' . $data['title'],
 						"quantity" => 1,
