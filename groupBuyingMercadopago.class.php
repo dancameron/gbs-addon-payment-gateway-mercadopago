@@ -24,7 +24,7 @@ class Group_Buying_Mercadopago extends Group_Buying_Offsite_Processors {
 	protected $expired;
 
 	protected static $mp;
-	const SANDBOX = TRUE;
+	const SANDBOX = FALSE;
 
 	public static function get_instance() {
 		if ( !( isset( self::$instance ) && is_a( self::$instance, __CLASS__ ) ) ) {
