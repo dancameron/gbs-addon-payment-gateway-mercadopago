@@ -177,28 +177,51 @@ class Group_Buying_Mercadopago extends Group_Buying_Offsite_Processors {
 				<script type="text/javascript">
 					jQuery(document).ready(function($){
 						var checkout_form = jQuery("#gb_checkout_payment");
+
+						// bind to submittion
 						checkout_form.bind('submit', function (e) {
+
+							// vars
+							var form = $(this);
 							var form_url = checkout_form.attr( 'action' );
 
-							jQuery("#checkout_mp_icon").hide();
-							jQuery('.checkout_block').fadeOut();
-							jQuery('#mercado_button').append(gb_ajax_gif);
+							// Prevent loop if already submitted
+							if ( form.data('submitted') !== true ) {
 
-							jQuery('body,html').animate({
-								scrollTop: $("#gb_checkout_payment").offset().top
-							}, 800);
+								// Prevent synchronousness submission
+								e.preventDefault();
 
-							// send AJAX request
-							jQuery.post(
-								form_url,
-								$(this).serialize(),
-								function( data ) {
-									$("#mercado_button").html( data ).fadeIn();
-								}
-							);
-							// Prevent synchronousness submission
-				        	e.preventDefault();
-				        	return false;
+								// Set to submitted to prevent loop
+								form.data('submitted', true );
+
+								// hide stuff
+								jQuery("#checkout_mp_icon").hide();
+								jQuery('.checkout_block').fadeOut();
+								jQuery('#mercado_button').append(gb_ajax_gif);
+								// scroll
+								jQuery('body,html').animate({
+									scrollTop: $("#gb_checkout_payment").offset().top
+								}, 800);
+
+								// send AJAX request
+								jQuery.post(
+									form_url,
+									$(this).serialize(),
+									function( response ) {
+										console.log(response);
+										// If the return a checkout page, then an error occurred.
+										if ( response.indexOf("html") >= 0 ) {
+											form.submit(); // resubmit
+											return false;
+										}
+										else {
+											// Set to submitted to prevent loop
+											$("#mercado_button").html( response ).fadeIn(); // Add button
+										}
+									}
+								);
+								return false;
+							}
 						});
 					});
 				</script>
