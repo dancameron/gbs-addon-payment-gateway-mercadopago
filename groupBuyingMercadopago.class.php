@@ -46,7 +46,7 @@ class Group_Buying_Mercadopago extends Group_Buying_Offsite_Processors {
 		add_filter( 'gb_checkout_pages', array( $this, 'remove_review_page' ) );
 
 		// Send offsite ... using the review page to redirect since it's a form submit.
-		add_action( 'gb_send_offsite_for_payment', array( $this, 'send_offsite' ), 10, 1 );
+		//add_action( 'gb_send_offsite_for_payment', array( $this, 'send_offsite' ), 10, 1 );
 		// Handle the return of user from pxpay
 		add_action( 'gb_load_cart', array( $this, 'back_from_mp' ), 10, 0 );
 		// Complete purchase
@@ -59,7 +59,7 @@ class Group_Buying_Mercadopago extends Group_Buying_Offsite_Processors {
 		add_filter( 'group_buying_template_meta_boxes/deal-limits.php', array( $this, 'display_limits_meta_box' ), 10 );
 
 		// Change button
-		add_filter( 'gb_checkout_payment_controls', array( $this, 'payment_controls' ), 20, 2 );
+		add_filter( 'gb_checkout_payment_controls', array( $this, 'payment_controls' ), 200, 2 );
 
 		// Test user
 		// add_filter( 'init', array( $this, 'get_test_user' ) );
@@ -118,6 +118,93 @@ class Group_Buying_Mercadopago extends Group_Buying_Offsite_Processors {
 			$checkout->save_cache_on_redirect( NULL ); // Save cache since it's not being saved via wp_redirect
 			$this->redirect_marcadopago( $checkout );
 		}
+	}
+
+	public function payment_controls( $controls, Group_Buying_Checkouts $checkout ) {
+		error_log( "controls: " . print_r( $controls, true ) );
+		$cart = $checkout->get_cart();
+
+		$user = get_userdata( get_current_user_id() );
+		$filtered_total = $this->get_payment_request_total( $checkout );
+		if ( $filtered_total < 0.01 ) {
+			return array();
+		}
+
+		self::set_token( $cart->get_id() . '_' . gb_get_number_format( $this->get_payment_request_total( $checkout ) ) ); 
+
+		// products
+		$item_description = '';
+		foreach ( $cart->get_items() as $key => $item ) {
+			$deal = Group_Buying_Deal::get_instance( $item['deal_id'] );
+			$item_description .= $item['quantity'] .'*'. $deal->get_title( $item['data'] ) .'; ';
+		}
+
+		$data = array(
+			"external_reference" => self::get_token(),
+			"items" => array(
+				array( 
+					"id" => self::get_token(),
+					"title" => substr( get_bloginfo('name'), 0, 90),
+					"description" => $item_description,
+					"quantity" => (int) 1,
+					"unit_price" => (int) gb_get_number_format( $filtered_total ),
+					"currency_id" => $this->curcode,
+					"picture_url" => gb_get_header_logo(),
+				) ),
+			"payer" => array(
+				"name" => $checkout->cache['billing']['first_name'],
+				"surname" => $checkout->cache['billing']['last_name'],
+				"email" => $user->user_email
+			),
+			"back_urls" => array(
+				"pending" => $this->success_returnurl,
+				"success" => $this->success_returnurl,
+				"cacnel" => $this->cancel_url,
+				"error" => $this->error_url,
+
+			),
+		);
+
+		// Call MP API
+		$access_token = $this->get_access_token();
+		$url = 'https://api.mercadolibre.com/checkout/preferences?access_token=' . $access_token;
+		$headers = array( 'Content-Type:application/json', 'Accept: application/json' );
+		$options = array(
+			CURLOPT_RETURNTRANSFER => '1',
+			CURLOPT_HTTPHEADER => $headers,
+			CURLOPT_SSL_VERIFYPEER => 'false',
+			CURLOPT_URL => $url,
+			CURLOPT_POSTFIELDS => json_encode($data),
+			CURLOPT_CUSTOMREQUEST => "POST",
+		);
+		$call = curl_init();
+		curl_setopt_array( $call, $options );
+		// execute the curl call
+		$dados = curl_exec( $call );
+		// close the call
+		curl_close( $call );
+		$response = json_decode($dados, true);
+		error_log( "response: " . print_r( $response, true ) );
+		/*/
+		$return_response = wp_remote_post( $url, array(
+				'method' => 'POST',
+				'body' => json_encode($data),
+				'timeout' => apply_filters( 'http_request_timeout', 15 ),
+				'sslverify' => false,
+				'headers' => $headers
+			) );
+		$response = json_decode( wp_remote_retrieve_body( $return_response ), true );
+		error_log( "button api resposne: " . print_r( $response, true ) );
+		/**/
+
+		$link = $response['init_point'];
+		$button = '<a href="'.$link.'" name="MP-payButton" class="blue-l-rn-ar" id="btnPagar">Comprar</a>';
+		$button .= '<script type="text/javascript" src="https://www.mercadopago.com/org-img/jsapi/mptools/buttons/render.js"></script>';
+		
+		if ( isset( $controls['review'] ) ) {
+			$controls['review'] = $button;
+		}
+		return $controls;
 	}
 
 	public function redirect_marcadopago( Group_Buying_Checkouts $checkout ) {
@@ -242,6 +329,7 @@ class Group_Buying_Mercadopago extends Group_Buying_Offsite_Processors {
 	}
 
 	public function back_from_mp() {
+		error_log( "return : " . print_r( $_REQUEST, true ) );
 		// hoping these are set when the user comes back from mercado
 		if ( isset( $_REQUEST['id'] ) ) {
 
@@ -549,15 +637,6 @@ class Group_Buying_Mercadopago extends Group_Buying_Offsite_Processors {
 			// chmod ( $log_file , 0600 );
 			error_log( $response );
 		}
-	}
-
-	public function payment_controls( $controls, Group_Buying_Checkouts $checkout ) {
-
-		if ( isset( $controls['review'] ) ) {
-			$controls['review'] = str_replace( 'value="'.self::__( 'Review' ).'"', ' src="https://s3.amazonaws.com/checkout_images/466be15d-fdb2-4d70-9717-b2b267f296cc.png" value="'.self::__( 'Mercadopago' ).'"', $controls['review'] );
-			$controls['review'] = str_replace( 'type="submit"', 'type="image"', $controls['review'] );
-		}
-		return $controls;
 	}
 
 	public static function set_token( $token ) {
