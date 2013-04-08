@@ -1,7 +1,7 @@
 <?php
 /*
 Plugin Name: Group Buying Payment Processor - Mercadopago
-Version: .1
+Version: .5
 Plugin URI: http://sproutventure.com/wordpress/group-buying
 Description: Mercadopago Payments Add-on.
 Author: Sprout Venture
