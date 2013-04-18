@@ -239,14 +239,14 @@ class Group_Buying_Mercadopago extends Group_Buying_Offsite_Processors {
 		if ( isset( $_REQUEST['mp_payment'] ) && $_REQUEST['mp_payment'] ) {
 			
 			// Tokens should be set.
-			$token = $this->get_token();
-			if ( !$token ) {
+			$external_reference = $this->get_token();
+			if ( !$external_reference ) {
 				$this->set_error_messages( gb__( 'Payment Failure. Token Mismatch.' ), TRUE );
 				return FALSE;
 			}
 
 			// Check the payment status
-			$status = $this->get_status( $token );
+			$status = $this->get_status_by_external_reference();
 			if ( self::DEBUG ) {
 				$this->set_error_messages( 'payment status check: '.print_r( $status, TRUE ), FALSE );
 			}
@@ -254,8 +254,8 @@ class Group_Buying_Mercadopago extends Group_Buying_Offsite_Processors {
 			if ( !empty( $status ) ) {
 
 				// What's the payment status?
-				$order_status = ( isset( $status['status'] ) ) ? $status['status'] : $status['Status']; // API docs have a typo?
-				$order_id = $status['order_id'];
+				$order_status = $status['status'];
+				$order_id = $status['id'];
 
 				// Cycle through the statuses and complete the checkout pages if warranted
 				switch ( $order_status ) {
@@ -268,12 +268,12 @@ class Group_Buying_Mercadopago extends Group_Buying_Offsite_Processors {
 					$this->complete_checkout_pages();
 					$this->set_error_messages( gb__( 'Your Payment is Currently Pending or In Process' ), TRUE );
 					break;
-				case 'reject':
+				case 'rejected':
 				case 'refunded':
 				case 'cancelled':
 				case 'in_metiation':
 				default:
-					$this->set_error_messages( gb__( 'Your Payment has been cancelled, refunded or rejected.' ), TRUE );
+					$this->set_error_messages( sprintf( gb__( 'Your Payment has been cancelled, refunded or rejected. Code: %s' ), $status['status_detail'] ), TRUE );
 				}
 			} else { // that id didn't response well.
 				$this->set_error_messages( gb__( 'Payment Failure.' ), TRUE );
@@ -295,7 +295,7 @@ class Group_Buying_Mercadopago extends Group_Buying_Offsite_Processors {
 	public function complete_checkout_pages() {
 		$_REQUEST['gb_checkout_action'] = 'back_from_mp';
 		if ( self::DEBUG ) {
-			$this->set_error_messages( 'back_from_pg: '.print_r( $_REQUEST, TRUE ), FALSE );
+			$this->set_error_messages( 'back_from_mp: '.print_r( $_REQUEST, TRUE ), FALSE );
 		}
 	}
 
@@ -353,10 +353,6 @@ class Group_Buying_Mercadopago extends Group_Buying_Offsite_Processors {
 		$payment = Group_Buying_Payment::get_instance( $payment_id );
 		do_action( 'payment_authorized', $payment );
 
-		if ( $order_status == 'approved' ) {
-			$this->complete_payment( $payment );
-		}
-
 		self::unset_token();
 		return $payment;
 	}
@@ -402,9 +398,9 @@ class Group_Buying_Mercadopago extends Group_Buying_Offsite_Processors {
 				$mp_id = $data['mp_id'];
 
 				// Get the status
-				$order_status = $this->get_status( $mp_id );
+				$order_status = $this->get_status_by_external_reference( $mp_id );
 				// If approved than complete the payment
-				if ( $order_status == 'approved' ) {
+				if ( $status['status'] == 'approved' ) {
 					$this->complete_payment( $payment );
 				}
 				// Add the status response to the data of the payment
@@ -442,6 +438,7 @@ class Group_Buying_Mercadopago extends Group_Buying_Offsite_Processors {
 
 		$cart = $checkout->get_cart();
 		$user = get_userdata( get_current_user_id() );
+		$ext_reference = self::set_token( $cart->get_id() . microtime(TRUE) );
 
 		// products
 		$item_description = '';
@@ -450,10 +447,10 @@ class Group_Buying_Mercadopago extends Group_Buying_Offsite_Processors {
 			$item_description .= $item['quantity'] .'*'. $deal->get_title( $item['data'] ) .'; ';
 		}
 		$data = array(
-			"external_reference" => $cart->get_id(),
+			"external_reference" => $ext_reference,
 			"items" => array(
 				array( 
-					"id" => self::get_token(),
+					"id" => $cart->get_id(),
 					"title" => substr( get_bloginfo('name'), 0, 90),
 					"description" => $item_description,
 					"quantity" => (int) 1,
@@ -474,6 +471,11 @@ class Group_Buying_Mercadopago extends Group_Buying_Offsite_Processors {
 
 			),
 		);
+
+		if ( self::DEBUG ) {
+			$this->set_error_messages( 'mp link data: '.print_r( $data, TRUE ), FALSE );
+		}
+
 		$mp = self::get_mp();
 		$preference_result = $mp->create_preference( $data );
 
@@ -485,7 +487,7 @@ class Group_Buying_Mercadopago extends Group_Buying_Offsite_Processors {
 			return FALSE;
 		}
 		// Set the token/id for the user.
-		self::set_token( $preference_result['response']['id'] );
+		// self::set_token( $preference_result['response']['id'] );
 
 		if ( self::SANDBOX ) {
 			return $preference_result['response']['sandbox_init_point'];
@@ -498,22 +500,19 @@ class Group_Buying_Mercadopago extends Group_Buying_Offsite_Processors {
 	 * @param  int $id the id provided on return
 	 * @return      
 	 */
-	public function get_status( $id ) {
-		// Sets the filters you want
-		$filters = array(
-			"site_id" => $this->site_id, // Argentina: MLA; Brasil: MLB
-			"id" => $id
-		);
-
+	public function get_status_by_id( $id ) {
 		$mp = self::get_mp();
-		$payment_info = $mp->search_payment( $filters );
-		if ( isset( $payment_info['collection']['status'] ) ) {
-			return $payment_info['collection']['status'];
+		$payment_info = $mp->get_payment_info( $id );
+		if ( isset( $payment_info['response']['results'][0]['collection'] ) ) {
+			return $payment_info['response']['results'][0]['collection'];
 		}
 		return FALSE;
 	}
 
-	public function get_status_by_cart_id( $id ) {
+	public function get_status_by_external_reference( $id = 0 ) {
+		if ( !$id ) {
+			$id = self::get_token();
+		}
 
 		// Sets the filters you want
 		$filters = array(
@@ -524,7 +523,10 @@ class Group_Buying_Mercadopago extends Group_Buying_Offsite_Processors {
 		// Search payment data according to filters
 		$mp = self::get_mp();
 		$search_result = $mp->search_payment( $filters );
-		return $search_response['response'];
+		if ( isset( $search_result['response']['results'][0]['collection'] ) ) {
+			return $search_result['response']['results'][0]['collection'];
+		}
+		return FALSE;
 	}
 
 	/**
@@ -550,6 +552,7 @@ class Group_Buying_Mercadopago extends Group_Buying_Offsite_Processors {
 	public static function set_token( $token ) {
 		global $blog_id;
 		update_user_meta( get_current_user_id(), $blog_id.'_'.self::TOKEN_KEY, $token );
+		return $token;
 	}
 
 	public static function unset_token() {
