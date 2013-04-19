@@ -400,7 +400,7 @@ class Group_Buying_Mercadopago extends Group_Buying_Offsite_Processors {
 				// Get the status
 				$order_status = $this->get_status_by_external_reference( $mp_id );
 				// If approved than complete the payment
-				if ( $status['status'] == 'approved' ) {
+				if ( $order_status['status'] == 'approved' ) {
 					$this->complete_payment( $payment );
 				}
 				// Add the status response to the data of the payment
