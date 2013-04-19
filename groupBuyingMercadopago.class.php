@@ -414,7 +414,7 @@ class Group_Buying_Mercadopago extends Group_Buying_Offsite_Processors {
 	 * Complete the payment
 	 */
 	public function complete_payment( Group_Buying_Payment $payment ) {
-		$purchase = $payment->get_purchase();
+		$purchase = Group_Buying_Purchase::get_instance( $payment->get_purchase() );
 		$items_captured = array(); // Creating simple array of items that are captured
 		foreach ( $purchase->get_products() as $item ) {
 			$items_captured[] = $item['deal_id'];
