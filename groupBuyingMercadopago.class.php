@@ -402,10 +402,17 @@ class Group_Buying_Mercadopago extends Group_Buying_Offsite_Processors {
 				// If approved than complete the payment
 				if ( $order_status['status'] == 'approved' ) {
 					$this->complete_payment( $payment );
+				} else {
+					$this->set_error_messages( 'maybe complete payment id: '.print_r( $payment->get_id(), TRUE ), FALSE );
+					$this->set_error_messages( 'maybe complete payment: '.print_r( $order_status, TRUE ), FALSE );
 				}
 				// Add the status response to the data of the payment
-				$data['payment_status_response'][] = $status_data;
+				if ( !is_array( $data['payment_status_response'] ) ) {
+					$data['payment_status_response'] = array();
+				}
+				$data['payment_status_response'][] = sprintf( 'Status Checked: %s - Result: %s', date( get_option( 'date_format' ).' @ '.get_option( 'time_format' ), time() ), $order_status['status'] );
 				$payment->set_data( $data );
+				
 			}
 		}
 	}
